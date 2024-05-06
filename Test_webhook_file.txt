@@ -1,2 +1,12 @@
 # Testing webhook for the project
 # a test again
+
+
+#random
+docker build -t my-static-website .
+
+docker run -d -p 8080:80 --name my-static-website-container my-static-website
+
+docker stop my-static-website-container
+
+docker rm my-static-website-container
