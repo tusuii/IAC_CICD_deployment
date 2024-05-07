@@ -3,10 +3,10 @@
 
 
 #random
-docker build -t my-static-website .
+docker build -t webapp .
 
-docker run -d -p 8080:80 --name my-static-website-container my-static-website
+docker run -d -p 8070:80 --name app webapp
 
-docker stop my-static-website-container
+docker stop app
 
-docker rm my-static-website-container
+docker rm app
