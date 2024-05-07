@@ -1,0 +1,89 @@
+pipeline {
+    agent any
+    
+    environment {
+        SCANNER_HOME = tool 'sonarqube'
+    }
+
+    stages {
+        stage('Github Checkout') {
+            steps {
+                // Checkout the source code from the repository
+                checkout([$class: 'GitSCM',
+                          branches: [[name: '*/main']],
+                          userRemoteConfigs: [[url: 'https://github.com/tusuii/IAC_CICD_deployment.git']]])
+            }
+        }
+        
+        stage('SonarQube Scan') {
+            steps {
+                script {
+                    sh "${SCANNER_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectKey=sonarqube \
+                        -Dsonar.projectName=sonarqube \
+                        -Dsonar.sources=. \
+                        -Dsonar.java.binaries=. \
+                        -Dsonar.host.url=http://<sonarquve IP>/ \
+                        -Dsonar.login=<login credientials from sonarqube generate them>"
+                }
+            }
+        }
+        
+        stage('OWASP Scan') {
+            steps {
+                script {
+                    // Perform OWASP Dependency Check
+                    dependencyCheck additionalArguments: '''
+                        -o './'
+                        -s './'
+                        -f 'ALL'
+                        --prettyPrint''', odcInstallation: 'DP'
+                    // Publish OWASP Dependency Check results
+                    dependencyCheckPublisher pattern: 'dependency-check-report.xml'
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    // Check if Docker image exists
+                    def imageExists = sh(script: "docker images -q webapp:latest", returnStatus: true) == 0
+                    if (!imageExists) {
+                        // Build Docker image if it doesn't exist
+                        sh "docker build -t webapp ."
+                        
+                        
+                    } else {
+                        // Stop and remove existing Docker container
+                        sh "docker stop app"
+                        sh "docker rm app"
+                        sh "docker build -t webapp ."
+                    }
+                }
+            }
+        }
+        
+        stage('Run Docker Application Container') {
+            steps {
+                // Run Docker container
+                script {
+                    sh "docker run -d -p 8070:80 --name app webapp"
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Docker container is up and running.'
+        }
+        failure {
+            echo 'Failed to build Docker image or run container.'
+        }
+    }
+    
+    triggers {
+        githubPush()
+    }
+}
